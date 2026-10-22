@@ -1,0 +1,80 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Housing Price Growth Forecasting and Historical Validation | Cameron Batts</title><style>body{margin:0;background:#f7f8fa;color:#152540;font:16px/1.65 system-ui}main{max-width:950px;margin:auto;padding:32px 24px}h1{font:bold 2.4rem Georgia}h2{border-bottom:2px solid #e8c97a;margin-top:36px}pre{padding:18px;background:white;border-left:3px solid #c9a84c;white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px}details{margin:16px 0}summary{cursor:pointer}p{overflow-wrap:anywhere}a{color:#1a3560}img{max-width:100%;height:auto}</style><main><a href="https://cameron-batts.github.io/">← Portfolio</a><h1>Housing Price Growth Forecasting and Historical Validation</h1><p><strong>Cameron Batts</strong></p><h2>Problem</h2><p>Compare price-growth forecasts from a seasonal baseline, ARIMA and a two-variable VAR using a fixed historical split.</p><h2>Approach</h2><p>Use the included FRED CSV snapshots by default, validate uninterrupted monthly dates and calculate monthly log growth. Fit on data through December 2013 and evaluate 24 static forecast steps for January 2014–December 2015. Keep the extended historical demonstrations separately labeled.</p><h2>Verified findings</h2><p>The included snapshots contain 780 housing-start observations (1959–2023) and 444 price-index observations (1987–2023). They overlap for 444 consecutive months from January 1987 through December 2023 with no missing values. No revised model scores have been generated.</p><h2>Limitations</h2><p>The extended historical notebooks seasonally adjust price growth using the full sample before the train/test split, exposing training transformations to future data. Historical bagging uses four paths; that alone does not establish robust uncertainty or better forecasts. The new offline workflow changes the growth definition and evaluation setup and remains unexecuted. Granger predictability and model impulse responses do not establish structural causality. Historical release lags and data revisions are not reconstructed.</p><h2>Data</h2><p>HOUSTNSA is U.S. Census Bureau/HUD housing starts, monthly, not seasonally adjusted, in thousands of units. CSUSHPINSA is the S&amp;P national home-price index, monthly, not seasonally adjusted, January 2000=100. The bundled snapshots end in December 2023 and are not current observations. Preserve source attribution and applicable index-data terms.</p><h2>Verification</h2><p>Counts and relevant numerical findings were checked independently in Python. R is unavailable here, so revised R code was reviewed but not parsed, executed or rendered. Historical images are retained separately from the revised workflow.</p><p><a href="https://github.com/Cameron-Batts/Housing-Price-Timeseries/blob/main/Notebooks/housing_price_timeseries_offline.Rmd">View revised R Markdown source</a></p><details><summary>Revised R Markdown workflow (not executed here)</summary><pre>---
+title: &quot;Housing Price Growth Forecasting and Historical Validation&quot;
+author: &quot;Cameron Batts&quot;
+output: html_document
+---
+
+## Problem
+Compare price-growth forecasts from a seasonal baseline, ARIMA and a two-variable VAR using a fixed historical split.
+
+## Approach
+Use the included FRED CSV snapshots by default, validate uninterrupted monthly dates and calculate monthly log growth. Fit on data through December 2013 and evaluate 24 static forecast steps for January 2014–December 2015. Keep the extended historical demonstrations separately labeled.
+
+## Verified findings
+The included snapshots contain 780 housing-start observations (1959–2023) and 444 price-index observations (1987–2023). They overlap for 444 consecutive months from January 1987 through December 2023 with no missing values. No revised model scores have been generated.
+
+## Limitations
+The extended historical notebooks seasonally adjust price growth using the full sample before the train/test split, exposing training transformations to future data. Historical bagging uses four paths; that alone does not establish robust uncertainty or better forecasts. The new offline workflow changes the growth definition and evaluation setup and remains unexecuted. Granger predictability and model impulse responses do not establish structural causality. Historical release lags and data revisions are not reconstructed.
+
+## Data
+HOUSTNSA is U.S. Census Bureau/HUD housing starts, monthly, not seasonally adjusted, in thousands of units. CSUSHPINSA is the S&amp;P national home-price index, monthly, not seasonally adjusted, January 2000=100. The bundled snapshots end in December 2023 and are not current observations. Preserve source attribution and applicable index-data terms.
+
+## Verification
+Counts and relevant numerical findings were checked independently in Python. R is unavailable here, so revised R code was reviewed but not parsed, executed or rendered. Historical images are retained separately from the revised workflow.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+project_root &lt;- if (dir.exists(&quot;Data&quot;)) &quot;.&quot; else &quot;..&quot;
+knitr::opts_knit$set(root.dir = normalizePath(project_root))
+```
+```{r data}
+library(forecast)
+library(vars)
+starts &lt;- read.csv(&quot;Data/HOUSTNSA.csv&quot;)
+prices &lt;- read.csv(&quot;Data/CSUSHPINSA.csv&quot;)
+stopifnot(!anyDuplicated(starts$observation_date), !anyDuplicated(prices$observation_date))
+d &lt;- merge(prices, starts, by = &quot;observation_date&quot;)
+d &lt;- d[order(d$observation_date), ]
+d$Date &lt;- as.Date(d$observation_date)
+stopifnot(!anyNA(d), all(d$CSUSHPINSA &gt; 0), all(d$HOUSTNSA &gt; 0))
+stopifnot(identical(as.character(d$Date),
+                    as.character(seq(min(d$Date), max(d$Date), by = &quot;month&quot;))))
+# Both series are monthly and not seasonally adjusted. Starts are in thousands of units.
+growth &lt;- cbind(PriceGrowth = 100 * diff(log(d$CSUSHPINSA)),
+                StartsGrowth = 100 * diff(log(d$HOUSTNSA)))
+dates &lt;- d$Date[-1]
+y &lt;- ts(growth, start = c(as.integer(format(dates[1], &quot;%Y&quot;)),
+                         as.integer(format(dates[1], &quot;%m&quot;))), frequency = 12)
+train &lt;- window(y, end = c(2013, 12))
+# Fixed historical 24-month test period; no training transformations use future values.
+test &lt;- window(y, start = c(2014, 1), end = c(2015, 12))
+stopifnot(nrow(test) == 24, end(train)[1] == 2013)
+```
+
+## Compare a baseline, ARIMA and VAR
+```{r forecast}
+price_train &lt;- train[, &quot;PriceGrowth&quot;]
+arima_fit &lt;- auto.arima(price_train, seasonal = TRUE)
+# Fixed lag order; seasonal dummies are fitted on training months only.
+var_fit &lt;- VAR(train, p = 2, type = &quot;const&quot;, season = 12)
+pred &lt;- cbind(
+  SeasonalNaive = as.numeric(snaive(price_train, h = 24)$mean),
+  ARIMA = as.numeric(forecast::forecast(arima_fit, h = 24)$mean),
+  VAR = predict(var_fit, n.ahead = 24)$fcst$PriceGrowth[, &quot;fcst&quot;])
+actual &lt;- as.numeric(test[, &quot;PriceGrowth&quot;])
+errors &lt;- sweep(pred, 1, actual, &quot;-&quot;)
+data.frame(model = colnames(pred), MAE = colMeans(abs(errors)),
+           RMSE = sqrt(colMeans(errors^2)))
+plot(ts(cbind(actual, pred), start = c(2014,1), frequency = 12),
+     plot.type = &quot;single&quot;, col = 1:4, lty = 1:4, ylab = &quot;100 x monthly log change&quot;)
+legend(&quot;topleft&quot;, legend = c(&quot;Actual&quot;, colnames(pred)), col = 1:4, lty = 1:4, cex = 0.7)
+```
+
+## Diagnostics and interpretation
+```{r diagnostics}
+checkresiduals(arima_fit)
+serial.test(var_fit, lags.pt = 12, type = &quot;PT.asymptotic&quot;)
+causality(var_fit, cause = &quot;StartsGrowth&quot;)$Granger
+```
+This is a newly added, unexecuted validation workflow, not a rerun of the archived results. Its target is monthly log price growth without full-sample seasonal adjustment, so historical scores from the extended notebooks are not directly comparable. Granger tests concern lagged predictability under the model specification; they do not establish structural causality. A single retrospective split does not establish performance across economic regimes. FRED revisions and historical release lags are not reconstructed, so this is not a real-time vintage backtest.
+</pre></details><h2>Historical visualizations</h2><p>These images are retained from the original analysis. They do not represent execution of the revised workflow.</p><figure><img alt="Historical Growth-Index visualization" src="https://raw.githubusercontent.com/Cameron-Batts/Housing-Price-Timeseries/main/Images/Growth-Index.png"><figcaption>Growth-Index — historical output</figcaption></figure><figure><img alt="Historical Housing-Growth-Forecast visualization" src="https://raw.githubusercontent.com/Cameron-Batts/Housing-Price-Timeseries/main/Images/Housing-Growth-Forecast.png"><figcaption>Housing-Growth-Forecast — historical output</figcaption></figure><figure><img alt="Historical Seasonality visualization" src="https://raw.githubusercontent.com/Cameron-Batts/Housing-Price-Timeseries/main/Images/Seasonality.png"><figcaption>Seasonality — historical output</figcaption></figure><figure><img alt="Historical Decomp-of-Additive-Time Series visualization" src="https://raw.githubusercontent.com/Cameron-Batts/Housing-Price-Timeseries/main/Images/Decomp-of-Additive-Time%20Series.png"><figcaption>Decomp-of-Additive-Time Series — historical output</figcaption></figure><figure><img alt="Historical Time-Series visualization" src="https://raw.githubusercontent.com/Cameron-Batts/Housing-Price-Timeseries/main/Images/Time-Series.png"><figcaption>Time-Series — historical output</figcaption></figure><figure><img alt="Historical Housing-Starts visualization" src="https://raw.githubusercontent.com/Cameron-Batts/Housing-Price-Timeseries/main/Images/Housing-Starts.png"><figcaption>Housing-Starts — historical output</figcaption></figure><h2>References</h2><ul><li><a href="https://fred.stlouisfed.org/series/HOUSTNSA">FRED housing starts, HOUSTNSA</a></li><li><a href="https://fred.stlouisfed.org/series/CSUSHPINSA">FRED national home-price index, CSUSHPINSA</a></li></ul></main></html>

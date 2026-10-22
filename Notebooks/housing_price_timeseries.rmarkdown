@@ -5,6 +5,9 @@ format:
     embed-resources: true
 ---
 
+> Historical extended workflow. Start with `housing_price_timeseries_offline.Rmd` for the included-data analysis. This legacy workflow requires API access and additional dependencies. Its full-sample seasonal adjustment is unsuitable for a leakage-free forecast comparison. Original source attribution was not documented.
+
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```

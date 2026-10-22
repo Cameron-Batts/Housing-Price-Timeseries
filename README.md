@@ -1,131 +1,42 @@
-# Housing Price Forecasting via Time Series & VAR Analysis
+# Housing Price Growth Forecasting and Historical Validation
 
-**Tools:** R · Quarto · Time Series Forecasting · VAR · FRED API · fredr · dplyr · ggplot2
+**Author:** Cameron Batts
 
----
+## Problem
+Compare price-growth forecasts from a seasonal baseline, ARIMA and a two-variable VAR using a fixed historical split.
 
-## Business Problem
+## Approach
+Use the included FRED CSV snapshots by default, validate uninterrupted monthly dates and calculate monthly log growth. Fit on data through December 2013 and evaluate 24 static forecast steps for January 2014–December 2015. Keep the extended historical demonstrations separately labeled.
 
-Housing markets are heavily influenced by macroeconomic conditions, supply trends, and long-term market cycles. This project analyzes historical housing price growth and housing starts to better understand market relationships and improve forecasting accuracy.
+## Verified findings
+The included snapshots contain 780 housing-start observations (1959–2023) and 444 price-index observations (1987–2023). They overlap for 444 consecutive months from January 1987 through December 2023 with no missing values. No revised model scores have been generated.
 
-The objective was to evaluate how housing supply activity relates to national housing price trends using both univariate and multivariate time series techniques.
+## Limitations
+The extended historical notebooks seasonally adjust price growth using the full sample before the train/test split, exposing training transformations to future data. Historical bagging uses four paths; that alone does not establish robust uncertainty or better forecasts. The new offline workflow changes the growth definition and evaluation setup and remains unexecuted. Granger predictability and model impulse responses do not establish structural causality. Historical release lags and data revisions are not reconstructed.
 
----
+## Data
+HOUSTNSA is U.S. Census Bureau/HUD housing starts, monthly, not seasonally adjusted, in thousands of units. CSUSHPINSA is the S&P national home-price index, monthly, not seasonally adjusted, January 2000=100. The bundled snapshots end in December 2023 and are not current observations. Preserve source attribution and applicable index-data terms.
 
-## Project Approach
+## Verification
+Counts and relevant numerical findings were checked independently in Python. R is unavailable here, so revised R code was reviewed but not parsed, executed or rendered. Historical images are retained separately from the revised workflow.
 
-- Retrieved economic data directly from the Federal Reserve Economic Data (FRED) API
-- Analyzed:
-  - S&P/Case-Shiller U.S. National Home Price Index
-  - U.S. Housing Starts
-- Cleaned and transformed monthly economic time series data
-- Conducted exploratory trend and stationarity analysis
-- Applied decomposition and forecasting workflows
-- Built Vector Autoregression (VAR) models to analyze dynamic relationships between variables
-- Used Quarto and R Markdown for reproducible analytical reporting
-
----
-
-## Data Sources
-
-Data obtained from the Federal Reserve Economic Data (FRED) database:
-
-| Series ID | Description |
-|---|---|
-| `CSUSHPINSA` | S&P/Case-Shiller U.S. National Home Price Index |
-| `HOUSTNSA` | New Privately-Owned Housing Units Started |
-
-Source: https://fred.stlouisfed.org/
-
----
-
-## Analytical Focus Areas
-
-- Time series forecasting
-- Housing market trend analysis
-- Economic indicator analysis
-- Vector Autoregression (VAR)
-- Seasonality decomposition
-- Forecasting with multiple variables
-- Reproducible analytical reporting
-
----
-
-## Project Visuals
-
-### Housing Starts Trend Analysis
-
-Historical housing starts activity showing long-term cyclical movement and market disruptions.
-
-![Housing Starts](./Images/Housing-Starts.png)
-
----
-
-### Housing Market & Price Index Comparison
-
-Comparison of housing starts and national housing price index behavior over time.
-
-![Time Series](./Images/Time-Series.png)
-
----
-
-### Additive Time Series Decomposition
-
-Decomposition of trend, seasonality, and residual components within the housing market time series.
-
-![Additive Decomposition](./Images/Decomp-of-Additive-Time%20Series.png)
-
----
-
-### Growth Index & Lag Analysis
-
-Lagged relationship analysis between housing starts growth and housing price growth.
-
-![Growth Index](./Images/Growth-Index.png)
-
----
-
-### Housing Growth Forecasting
-
-Forecasted housing starts growth using time series forecasting techniques.
-
-![Housing Growth Forecast](./Images/Housing-Growth-Forecast.png)
-
----
-
-### Seasonal Pattern Analysis
-
-Visualization of recurring seasonal behavior within housing market activity.
-
-![Seasonality](./Images/Seasonality.png)
-
----
-
-## Repository Structure
-
-```text
-data/        -> downloaded or processed datasets
-Images/      -> charts and forecasting visuals
-notebooks/   -> Quarto and R Markdown analytical workflows
-reports/     -> exported PDF project reports
+## Run
+Install R and Pandoc (or use RStudio), then run from the repository root:
+```r
+source("install.R")
+rmarkdown::render("Notebooks/housing_price_timeseries_offline.Rmd")
 ```
-
----
+Dependencies are unpinned. No API key is needed for the default workflow.
 
 ## Files
+- [R Markdown analysis](Notebooks/housing_price_timeseries_offline.Rmd)
+- [Readable analysis](Reports/housing_price_timeseries.html)
+- [Portfolio report](https://cameron-batts.github.io/housing_price_timeseries.html)
+- [Historical PDF](Reports/Housing%20Price%20Forecasting%20via%20Time%20Series%20%26%20VAR%20Analysis.pdf): may predate interpretation corrections.
 
-| File | Description |
-|------|-------------|
-| `notebooks/housing_price_timeseries.qmd` | Quarto workflow for housing price forecasting and VAR analysis |
-| `notebooks/housing_price_timeseries.rmarkdown` | R Markdown version of the project |
-| `reports/` | Exported reports and final outputs |
+## Extended historical demonstrations
+The original `.qmd` and `.rmarkdown` files remain available for reference. They require an API key and additional packages and are not the default reproducible workflow. Their full-sample seasonal adjustment makes historical forecast comparisons exploratory. Their source attribution was not documented; the revised analysis preserves these files rather than asserting new authorship of that historical material.
 
----
-
-# Author
-
-Cameron Batts
-
-GitHub: https://github.com/Cameron-Batts
-
-Portfolio: https://cameron-batts.github.io
+## References
+- [FRED housing starts, HOUSTNSA](https://fred.stlouisfed.org/series/HOUSTNSA)
+- [FRED national home-price index, CSUSHPINSA](https://fred.stlouisfed.org/series/CSUSHPINSA)

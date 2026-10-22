@@ -1,0 +1,79 @@
+---
+title: "Housing Price Growth Forecasting and Historical Validation"
+author: "Cameron Batts"
+output: html_document
+---
+
+## Problem
+Compare price-growth forecasts from a seasonal baseline, ARIMA and a two-variable VAR using a fixed historical split.
+
+## Approach
+Use the included FRED CSV snapshots by default, validate uninterrupted monthly dates and calculate monthly log growth. Fit on data through December 2013 and evaluate 24 static forecast steps for January 2014–December 2015. Keep the extended historical demonstrations separately labeled.
+
+## Verified findings
+The included snapshots contain 780 housing-start observations (1959–2023) and 444 price-index observations (1987–2023). They overlap for 444 consecutive months from January 1987 through December 2023 with no missing values. No revised model scores have been generated.
+
+## Limitations
+The extended historical notebooks seasonally adjust price growth using the full sample before the train/test split, exposing training transformations to future data. Historical bagging uses four paths; that alone does not establish robust uncertainty or better forecasts. The new offline workflow changes the growth definition and evaluation setup and remains unexecuted. Granger predictability and model impulse responses do not establish structural causality. Historical release lags and data revisions are not reconstructed.
+
+## Data
+HOUSTNSA is U.S. Census Bureau/HUD housing starts, monthly, not seasonally adjusted, in thousands of units. CSUSHPINSA is the S&P national home-price index, monthly, not seasonally adjusted, January 2000=100. The bundled snapshots end in December 2023 and are not current observations. Preserve source attribution and applicable index-data terms.
+
+## Verification
+Counts and relevant numerical findings were checked independently in Python. R is unavailable here, so revised R code was reviewed but not parsed, executed or rendered. Historical images are retained separately from the revised workflow.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+project_root <- if (dir.exists("Data")) "." else ".."
+knitr::opts_knit$set(root.dir = normalizePath(project_root))
+```
+```{r data}
+library(forecast)
+library(vars)
+starts <- read.csv("Data/HOUSTNSA.csv")
+prices <- read.csv("Data/CSUSHPINSA.csv")
+stopifnot(!anyDuplicated(starts$observation_date), !anyDuplicated(prices$observation_date))
+d <- merge(prices, starts, by = "observation_date")
+d <- d[order(d$observation_date), ]
+d$Date <- as.Date(d$observation_date)
+stopifnot(!anyNA(d), all(d$CSUSHPINSA > 0), all(d$HOUSTNSA > 0))
+stopifnot(identical(as.character(d$Date),
+                    as.character(seq(min(d$Date), max(d$Date), by = "month"))))
+# Both series are monthly and not seasonally adjusted. Starts are in thousands of units.
+growth <- cbind(PriceGrowth = 100 * diff(log(d$CSUSHPINSA)),
+                StartsGrowth = 100 * diff(log(d$HOUSTNSA)))
+dates <- d$Date[-1]
+y <- ts(growth, start = c(as.integer(format(dates[1], "%Y")),
+                         as.integer(format(dates[1], "%m"))), frequency = 12)
+train <- window(y, end = c(2013, 12))
+# Fixed historical 24-month test period; no training transformations use future values.
+test <- window(y, start = c(2014, 1), end = c(2015, 12))
+stopifnot(nrow(test) == 24, end(train)[1] == 2013)
+```
+
+## Compare a baseline, ARIMA and VAR
+```{r forecast}
+price_train <- train[, "PriceGrowth"]
+arima_fit <- auto.arima(price_train, seasonal = TRUE)
+# Fixed lag order; seasonal dummies are fitted on training months only.
+var_fit <- VAR(train, p = 2, type = "const", season = 12)
+pred <- cbind(
+  SeasonalNaive = as.numeric(snaive(price_train, h = 24)$mean),
+  ARIMA = as.numeric(forecast::forecast(arima_fit, h = 24)$mean),
+  VAR = predict(var_fit, n.ahead = 24)$fcst$PriceGrowth[, "fcst"])
+actual <- as.numeric(test[, "PriceGrowth"])
+errors <- sweep(pred, 1, actual, "-")
+data.frame(model = colnames(pred), MAE = colMeans(abs(errors)),
+           RMSE = sqrt(colMeans(errors^2)))
+plot(ts(cbind(actual, pred), start = c(2014,1), frequency = 12),
+     plot.type = "single", col = 1:4, lty = 1:4, ylab = "100 x monthly log change")
+legend("topleft", legend = c("Actual", colnames(pred)), col = 1:4, lty = 1:4, cex = 0.7)
+```
+
+## Diagnostics and interpretation
+```{r diagnostics}
+checkresiduals(arima_fit)
+serial.test(var_fit, lags.pt = 12, type = "PT.asymptotic")
+causality(var_fit, cause = "StartsGrowth")$Granger
+```
+This is a newly added, unexecuted validation workflow, not a rerun of the archived results. Its target is monthly log price growth without full-sample seasonal adjustment, so historical scores from the extended notebooks are not directly comparable. Granger tests concern lagged predictability under the model specification; they do not establish structural causality. A single retrospective split does not establish performance across economic regimes. FRED revisions and historical release lags are not reconstructed, so this is not a real-time vintage backtest.

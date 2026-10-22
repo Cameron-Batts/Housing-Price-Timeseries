@@ -42,7 +42,7 @@ Install R and Pandoc (or use RStudio), then run from the repository root:
 source("install.R")
 rmarkdown::render("Notebooks/housing_price_timeseries_offline.Rmd")
 ```
-Tested numerical/NLP packages are recorded in requirements-validation.txt. No API key is needed for the default workflow.
+R package versions are recorded in Reports/validated_packages.csv and Reports/validated_session.txt. No API key is needed for the default workflow.
 
 ## Files
 - [R Markdown analysis](Notebooks/housing_price_timeseries_offline.Rmd)
